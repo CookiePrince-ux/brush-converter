@@ -4,73 +4,76 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brush Converter for Clip Studio Paint</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
     <div id="root"></div>
     
-    <script type="text/babel">
-        const { useState } = React;
-        const { Upload, Download, FileImage, Loader2, CheckCircle, XCircle, Info } = lucide;
+    <script>
+        // Simple vanilla JavaScript version - no React needed
+        const root = document.getElementById('root');
+        
+        let currentFile = null;
+        let converting = false;
+        let result = null;
+        let error = null;
 
-        function BrushConverter() {
-          const [file, setFile] = useState(null);
-          const [converting, setConverting] = useState(false);
-          const [result, setResult] = useState(null);
-          const [error, setError] = useState(null);
-
-          const handleFileUpload = (e) => {
-            const uploadedFile = e.target.files[0];
-            if (uploadedFile) {
-              setFile(uploadedFile);
-              setResult(null);
-              setError(null);
-            }
-          };
-
-          const detectBrushType = (fileName) => {
+        function detectBrushType(fileName) {
             const ext = fileName.toLowerCase().split('.').pop();
             if (ext === 'brushset') return 'procreate';
             if (ext === 'abr') return 'photoshop';
             return null;
-          };
+        }
 
-          const convertBrush = async () => {
-            if (!file) return;
+        function handleFileUpload(e) {
+            currentFile = e.target.files[0];
+            result = null;
+            error = null;
+            render();
+        }
 
-            setConverting(true);
-            setError(null);
-            setResult(null);
+        async function convertBrush() {
+            if (!currentFile) return;
+
+            converting = true;
+            error = null;
+            result = null;
+            render();
 
             try {
-              const brushType = detectBrushType(file.name);
-              
-              if (!brushType) {
-                throw new Error('Unsupported file format. Please upload .brushset (Procreate) or .abr (Photoshop) files.');
-              }
+                const brushType = detectBrushType(currentFile.name);
+                
+                if (!brushType) {
+                    throw new Error('Unsupported file format. Please upload .brushset (Procreate) or .abr (Photoshop) files.');
+                }
 
-              await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
-              const convertedFileName = file.name.replace(/\.(brushset|abr)$/i, '.sut');
-              
-              setResult({
-                originalFile: file.name,
-                convertedFile: convertedFileName,
-                brushType: brushType,
-                success: true
-              });
+                const convertedFileName = currentFile.name.replace(/\.(brushset|abr)$/i, '.sut');
+                
+                result = {
+                    originalFile: currentFile.name,
+                    convertedFile: convertedFileName,
+                    brushType: brushType,
+                    success: true
+                };
+                error = null;
 
             } catch (err) {
-              setError(err.message);
+                error = err.message;
+                result = null;
             } finally {
-              setConverting(false);
+                converting = false;
+                render();
             }
-          };
+        }
 
-          const downloadConvertedBrush = () => {
+        function downloadConvertedBrush() {
             const demoContent = `Clip Studio Paint Brush File
 Original: ${result.originalFile}
 Type: ${result.brushType}
@@ -85,156 +88,185 @@ Converted: ${new Date().toISOString()}`;
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-          };
-
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white p-8">
-              <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-12">
-                  <div className="flex items-center justify-center mb-4">
-                    <lucide.FileImage className="w-16 h-16 text-purple-300" />
-                  </div>
-                  <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                    Brush Converter
-                  </h1>
-                  <p className="text-xl text-purple-200">
-                    Convert Procreate & Photoshop brushes to Clip Studio Paint format
-                  </p>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
-                  <div className="flex items-start gap-3">
-                    <lucide.Info className="w-6 h-6 text-blue-300 flex-shrink-0 mt-1" />
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2">Supported Formats</h3>
-                      <ul className="space-y-1 text-purple-200">
-                        <li>• Procreate: .brushset files</li>
-                        <li>• Photoshop: .abr files</li>
-                        <li>• Output: .sut (Clip Studio Paint)</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border-2 border-dashed border-white/30 hover:border-purple-400 transition-colors">
-                  <input
-                    type="file"
-                    id="fileUpload"
-                    accept=".brushset,.abr"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="fileUpload"
-                    className="flex flex-col items-center cursor-pointer"
-                  >
-                    <lucide.Upload className="w-16 h-16 text-purple-300 mb-4" />
-                    <p className="text-xl font-semibold mb-2">
-                      {file ? file.name : 'Click to upload brush file'}
-                    </p>
-                    <p className="text-purple-300 text-sm">
-                      or drag and drop your .brushset or .abr file here
-                    </p>
-                  </label>
-                </div>
-
-                {file && !result && (
-                  <button
-                    onClick={convertBrush}
-                    disabled={converting}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg shadow-2xl"
-                  >
-                    {converting ? (
-                      <>
-                        <lucide.Loader2 className="w-6 h-6 animate-spin" />
-                        Converting...
-                      </>
-                    ) : (
-                      <>
-                        <lucide.FileImage className="w-6 h-6" />
-                        Convert to CSP Format
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {error && (
-                  <div className="bg-red-500/20 backdrop-blur-lg rounded-2xl p-6 border border-red-500/50 flex items-start gap-3">
-                    <lucide.XCircle className="w-6 h-6 text-red-300 flex-shrink-0" />
-                    <div>
-                      <h3 className="font-semibold text-lg mb-1">Conversion Failed</h3>
-                      <p className="text-red-200">{error}</p>
-                    </div>
-                  </div>
-                )}
-
-                {result && result.success && (
-                  <div className="bg-green-500/20 backdrop-blur-lg rounded-2xl p-6 border border-green-500/50">
-                    <div className="flex items-start gap-3 mb-6">
-                      <lucide.CheckCircle className="w-6 h-6 text-green-300 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">Conversion Successful!</h3>
-                        <p className="text-green-200 mb-4">
-                          Your {result.brushType} brush has been converted to CSP format
-                        </p>
-                        <div className="bg-white/10 rounded-lg p-4 space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-purple-300">Original:</span>
-                            <span className="font-mono">{result.originalFile}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-purple-300">Converted:</span>
-                            <span className="font-mono">{result.convertedFile}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={downloadConvertedBrush}
-                      className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center gap-3 text-lg shadow-2xl"
-                    >
-                      <lucide.Download className="w-6 h-6" />
-                      Download CSP Brush
-                    </button>
-                  </div>
-                )}
-
-                <div className="mt-12 bg-white/5 backdrop-blur-lg rounded-2xl p-8 border border-white/10">
-                  <h2 className="text-2xl font-bold mb-4">How to Use</h2>
-                  <ol className="space-y-3 text-purple-200">
-                    <li className="flex gap-3">
-                      <span className="font-bold text-purple-300">1.</span>
-                      <span>Upload your Procreate (.brushset) or Photoshop (.abr) brush file</span>
-                    </li>
-                    <li className="flex gap-3">
-                      <span className="font-bold text-purple-300">2.</span>
-                      <span>Click "Convert to CSP Format" and wait for processing</span>
-                    </li>
-                    <li className="flex gap-3">
-                      <span className="font-bold text-purple-300">3.</span>
-                      <span>Download your converted .sut file</span>
-                    </li>
-                    <li className="flex gap-3">
-                      <span className="font-bold text-purple-300">4.</span>
-                      <span>Import the .sut file into Clip Studio Paint via Window → Materials → Import Materials</span>
-                    </li>
-                  </ol>
-                </div>
-
-                <div className="mt-8 text-center text-purple-300 text-sm">
-                  <p>Built for digital artists • Free and open source</p>
-                </div>
-              </div>
-            </div>
-          );
         }
 
-        ReactDOM.render(<BrushConverter />, document.getElementById('root'));
-    </script>
-    
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
-        lucide.createIcons();
+        function render() {
+            root.innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white p-8">
+                    <div class="max-w-4xl mx-auto">
+                        <!-- Header -->
+                        <div class="text-center mb-12">
+                            <div class="flex items-center justify-center mb-4">
+                                <svg class="w-16 h-16 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <h1 class="text-5xl font-bold mb-4 bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+                                Brush Converter
+                            </h1>
+                            <p class="text-xl text-purple-200">
+                                Convert Procreate & Photoshop brushes to Clip Studio Paint format
+                            </p>
+                        </div>
+
+                        <!-- Info Card -->
+                        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-6 h-6 text-blue-300 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h3 class="font-semibold text-lg mb-2">Supported Formats</h3>
+                                    <ul class="space-y-1 text-purple-200">
+                                        <li>• Procreate: .brushset files</li>
+                                        <li>• Photoshop: .abr files</li>
+                                        <li>• Output: .sut (Clip Studio Paint)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload Area -->
+                        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8 border-2 border-dashed border-white/30 hover:border-purple-400 transition-colors">
+                            <input
+                                type="file"
+                                id="fileUpload"
+                                accept=".brushset,.abr"
+                                class="hidden"
+                            />
+                            <label for="fileUpload" class="flex flex-col items-center cursor-pointer">
+                                <svg class="w-16 h-16 text-purple-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <p class="text-xl font-semibold mb-2">
+                                    ${currentFile ? currentFile.name : 'Click to upload brush file'}
+                                </p>
+                                <p class="text-purple-300 text-sm">
+                                    or drag and drop your .brushset or .abr file here
+                                </p>
+                            </label>
+                        </div>
+
+                        <!-- Convert Button -->
+                        ${currentFile && !result ? `
+                            <button
+                                id="convertBtn"
+                                ${converting ? 'disabled' : ''}
+                                class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg shadow-2xl"
+                            >
+                                ${converting ? `
+                                    <svg class="w-6 h-6 spinner" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    Converting...
+                                ` : `
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Convert to CSP Format
+                                `}
+                            </button>
+                        ` : ''}
+
+                        <!-- Error Message -->
+                        ${error ? `
+                            <div class="bg-red-500/20 backdrop-blur-lg rounded-2xl p-6 border border-red-500/50 flex items-start gap-3">
+                                <svg class="w-6 h-6 text-red-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h3 class="font-semibold text-lg mb-1">Conversion Failed</h3>
+                                    <p class="text-red-200">${error}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Success Result -->
+                        ${result && result.success ? `
+                            <div class="bg-green-500/20 backdrop-blur-lg rounded-2xl p-6 border border-green-500/50">
+                                <div class="flex items-start gap-3 mb-6">
+                                    <svg class="w-6 h-6 text-green-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <h3 class="font-semibold text-lg mb-1">Conversion Successful!</h3>
+                                        <p class="text-green-200 mb-4">
+                                            Your ${result.brushType} brush has been converted to CSP format
+                                        </p>
+                                        <div class="bg-white/10 rounded-lg p-4 space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <span class="text-purple-300">Original:</span>
+                                                <span class="font-mono">${result.originalFile}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-purple-300">Converted:</span>
+                                                <span class="font-mono">${result.convertedFile}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    id="downloadBtn"
+                                    class="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center gap-3 text-lg shadow-2xl"
+                                >
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Download CSP Brush
+                                </button>
+                            </div>
+                        ` : ''}
+
+                        <!-- Instructions -->
+                        <div class="mt-12 bg-white/5 backdrop-blur-lg rounded-2xl p-8 border border-white/10">
+                            <h2 class="text-2xl font-bold mb-4">How to Use</h2>
+                            <ol class="space-y-3 text-purple-200">
+                                <li class="flex gap-3">
+                                    <span class="font-bold text-purple-300">1.</span>
+                                    <span>Upload your Procreate (.brushset) or Photoshop (.abr) brush file</span>
+                                </li>
+                                <li class="flex gap-3">
+                                    <span class="font-bold text-purple-300">2.</span>
+                                    <span>Click "Convert to CSP Format" and wait for processing</span>
+                                </li>
+                                <li class="flex gap-3">
+                                    <span class="font-bold text-purple-300">3.</span>
+                                    <span>Download your converted .sut file</span>
+                                </li>
+                                <li class="flex gap-3">
+                                    <span class="font-bold text-purple-300">4.</span>
+                                    <span>Import the .sut file into Clip Studio Paint via Window → Materials → Import Materials</span>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="mt-8 text-center text-purple-300 text-sm">
+                            <p>Built for digital artists • Free and open source</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Attach event listeners after rendering
+            const fileInput = document.getElementById('fileUpload');
+            if (fileInput) {
+                fileInput.addEventListener('change', handleFileUpload);
+            }
+
+            const convertBtn = document.getElementById('convertBtn');
+            if (convertBtn) {
+                convertBtn.addEventListener('click', convertBrush);
+            }
+
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', downloadConvertedBrush);
+            }
+        }
+
+        // Initial render
+        render();
     </script>
 </body>
 </html>
